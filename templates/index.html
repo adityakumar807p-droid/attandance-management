@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance Dashboard</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --primary: #2563eb;
+      --present: #dcfce7;
+      --present-text: #166534;
+      --absent: #fee2e2;
+      --absent-text: #991b1b;
+      --danger: #dc2626;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 24px;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    h1 { margin: 0 0 16px; font-size: 1.8rem; }
+
+    /* Flash messages */
+    .msg {
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin: 8px 0;
+      border-left: 4px solid var(--primary);
+    }
+
+    /* Card wrapper */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    /* Command form */
+    .cmd-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .cmd-form input[type="text"],
+    .cmd-form input[name="instruction"] {
+      flex: 1;
+      min-width: 250px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    .cmd-form input:focus {
+      outline: 2px solid var(--primary);
+      border-color: transparent;
+    }
+    button {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #1d4ed8; }
+    .confirm-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      width: 100%;
+    }
+    .hint { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+
+    /* Summary cards */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .stat .label { color: var(--muted); font-size: 0.85rem; }
+    .stat .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+
+    /* Search */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    #search {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-width: 220px;
+    }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 10px 12px;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    th {
+      background: #f9fafb;
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    td.name, th.name { text-align: left; }
+    tbody tr:hover { background: #f9fafb; }
+    tbody tr:last-child td { border-bottom: none; }
+
+    td.P { background: var(--present); color: var(--present-text); font-weight: 600; }
+    td.A { background: var(--absent); color: var(--absent-text); font-weight: 600; }
+    td.empty { color: #9ca3af; }
+
+    .pct { font-weight: 600; }
+    .pct.low {
+      color: var(--danger);
+      background: #fee2e2;
+      border-radius: 6px;
+      padding: 2px 8px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px;
+      color: var(--muted);
+    }
+
+    /* Legend */
+    .legend { display: flex; gap: 14px; font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 12px; height: 12px;
+      border-radius: 3px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .legend .lp::before { background: var(--present); }
+    .legend .la::before { background: var(--absent); }
+    .legend .ll::before { background: #fee2e2; border: 1px solid var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 Attendance Dashboard</h1>
+
+    {% for m in get_flashed_messages() %}
+      <p class="msg" role="status">{{ m }}</p>
+    {% endfor %}
+
+    <!-- Command form -->
+    <div class="card">
+      <form method="post" action="/ask" class="cmd-form">
+        <input name="instruction" placeholder="jaise: Rahul roll 106 add karo" aria-label="Instruction" required>
+        <button type="submit">Bhejo</button>
+        <label class="confirm-label">
+          <input type="checkbox" name="confirm" value="yes">
+          Remove confirm karo (sirf remove ke liye)
+        </label>
+      </form>
+      <p class="hint">Examples: "Rahul ki attendance 12 Oct ko P karo", "Roll 106 remove karo"</p>
+    </div>
+
+    <!-- Summary stats -->
+    {% set total = rows|length %}
+    {% set low_count = rows|selectattr('pct', 'lt', 75)|list|length %}
+    {% set avg = (rows|map(attribute='pct')|sum / total) if total else 0 %}
+    <div class="stats">
+      <div class="stat">
+        <div class="label">Total Students</div>
+        <div class="value">{{ total }}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Low Attendance (&lt; 75%)</div>
+        <div class="value" style="color: var(--danger);">{{ low_count }}</div>
+      </div>
+      <div class="stat">
+        <div class="label">Average Attendance</div>
+        <div class="value">{{ "%.1f"|format(avg) }}%</div>
+      </div>
+      <div class="stat">
+        <div class="label">Total Days</div>
+        <div class="value">{{ days|length }}</div>
+      </div>
+    </div>
+
+    <!-- Toolbar with search -->
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Naam ya roll se search karo..." aria-label="Search students">
+      <div class="legend">
+        <span class="lp">Present</span>
+        <span class="la">Absent</span>
+        <span class="ll">&lt; 75%</span>
+      </div>
+    </div>
+
+    <!-- Attendance table -->
+    <div class="table-wrap">
+      <table id="attendance">
+        <thead>
+          <tr>
+            <th>Roll</th>
+            <th class="name">Naam</th>
+            {% for d in days %}<th>{{ d }}</th>{% endfor %}
+            <th>%</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td>{{ r.rollno }}</td>
+            <td class="name">{{ r.name }}</td>
+            {% for d in days %}
+              {% set v = r.attendance[d] %}
+              <td class="{{ v if v in ['P','A'] else 'empty' }}">{{ v or '-' }}</td>
+            {% endfor %}
+            <td>
+              <span class="pct {{ 'low' if r.pct < 75 else '' }}">{{ "%.1f"|format(r.pct) }}%</span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="{{ days|length + 3 }}" class="empty-state">Abhi koi student record nahi hai.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Live search: naam ya roll se filter
+    const searchInput = document.getElementById('search');
+    const rowsEls = document.querySelectorAll('#attendance tbody tr');
+
+    searchInput.addEventListener('input', () => {
+      const q = searchInput.value.trim().toLowerCase();
+      rowsEls.forEach(tr => {
+        const roll = tr.cells[0]?.textContent.toLowerCase() || '';
+        const name = tr.cells[1]?.textContent.toLowerCase() || '';
+        tr.style.display = (roll.includes(q) || name.includes(q)) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>
